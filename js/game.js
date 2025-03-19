@@ -4,7 +4,7 @@
 class Game {
     constructor() {
         // Game version
-        this.version = "v1.1.5";
+        this.version = "v1.2.0";
         
         // Initialize class properties
         this.scene = null;
