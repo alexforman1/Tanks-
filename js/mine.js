@@ -1,13 +1,16 @@
+import * as THREE from 'three';
+import { Utils } from './utils.js';
+
 /**
  * Mine Class - Represents mines placed by tanks
  */
-class Mine {
+export class Mine {
     constructor(scene, position, owner = null) {
         this.scene = scene;
         this.position = position.clone();
         this.owner = owner;
         this.active = true;
-        this.timeToArm = 1000; // ms
+        this.timeToArm = 5000; // ms: Explode 5 seconds after placement
         this.creationTime = Date.now();
         this.explosionRadius = 3;
         this.damage = 1;
@@ -79,38 +82,17 @@ class Mine {
      */
     update(tanks) {
         if (!this.active) return null;
-        
-        // Check if mine is armed
         const now = Date.now();
-        const isArmed = now - this.creationTime > this.timeToArm;
-        
-        // Only check tanks if the mine is armed
-        if (isArmed && tanks && tanks.length > 0) {
-            for (const tank of tanks) {
-                // Skip the owner if the mine was just placed
-                if (tank === this.owner && now - this.creationTime < 3000) {
-                    continue;
-                }
-                
-                // Calculate distance to tank
-                const distance = Math.sqrt(
-                    Math.pow(this.position.x - tank.position.x, 2) +
-                    Math.pow(this.position.z - tank.position.z, 2)
-                );
-                
-                // Detonate if tank is close enough
-                if (distance < tank.size.x / 2 + this.size) {
-                    this.detonate();
-                    return {
-                        position: this.position,
-                        radius: this.explosionRadius,
-                        damage: this.damage,
-                        owner: this.owner
-                    };
-                }
-            }
+        // If 5 seconds have passed, detonate regardless of tank proximity
+        if (now - this.creationTime >= this.timeToArm) {
+            this.detonate();
+            return {
+                position: this.position,
+                radius: this.explosionRadius,
+                damage: this.damage,
+                owner: this.owner
+            };
         }
-        
         return null;
     }
     

@@ -1,9 +1,10 @@
+import { Utils } from './utils.js';
+
 /**
  * Level Definitions for Tanks! game
  * Contains map layouts, enemy configurations, and level progression
  */
-
-class LevelManager {
+export class LevelManager {
     constructor(game) {
         this.game = game;
         this.currentLevel = 0;

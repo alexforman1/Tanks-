@@ -2,7 +2,7 @@
  * Leaderboard Management System
  * Handles user names, scores, and persistent storage
  */
-class Leaderboard {
+export class Leaderboard {
     constructor() {
         this.leaderboardData = [];
         this.currentUser = null;

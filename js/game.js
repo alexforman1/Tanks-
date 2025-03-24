@@ -1,10 +1,19 @@
+import * as THREE from 'three';
+import { AudioManager } from './audio.js';
+import { LevelManager } from './levels.js';
+import { Leaderboard } from './leaderboard.js';
+import { PlayerTank, EnemyTank } from './tank.js';
+import { Projectile } from './projectile.js';
+import { Mine } from './mine.js';
+import { Utils } from './utils.js';
+
 /**
  * Game Class - Main game controller handling levels, entities, and game state
  */
-class Game {
+export class Game {
     constructor() {
         // Game version
-        this.version = "v1.2.0";
+        this.version = "v1.2.2";
         
         // Initialize class properties
         this.scene = null;
@@ -18,6 +27,7 @@ class Game {
         this.level = null;
         this.levelManager = null;
         this.leaderboard = null;
+        this.audioManager = new AudioManager();
         this.isRunning = false;
         this.isPaused = false;
         this.lives = 3;
@@ -28,7 +38,16 @@ class Game {
         this.lastFrameTime = 0;
         this.accumTime = 0;
         this.levelCompletionTimeout = null;
+        this.boundarySize = 25;
         
+        // Initialize DOM elements after a short delay to ensure they exist
+        setTimeout(() => {
+            this.initializeDOMElements();
+            this.setupEventListeners();
+        }, 100);
+    }
+    
+    initializeDOMElements() {
         // DOM elements
         this.container = document.getElementById('game-canvas');
         this.scoreElement = document.getElementById('score');
@@ -38,9 +57,8 @@ class Game {
         this.gameOver = document.getElementById('game-over');
         this.finalScoreElement = document.getElementById('final-score');
         this.leaderboardListElement = document.getElementById('leaderboard-list');
-        
-        // Game boundaries
-        this.boundarySize = 25;
+        this.playAgainButton = document.getElementById('play-again');
+        this.mainMenuButton = document.getElementById('main-menu');
         
         // Setup three.js scene
         this.setupScene();
@@ -48,9 +66,6 @@ class Game {
         // Initialize managers
         this.levelManager = new LevelManager(this);
         this.leaderboard = new Leaderboard();
-        
-        // Setup event listeners
-        this.setupEventListeners();
         
         // Set up HUD
         this.setupHUD();
@@ -241,10 +256,9 @@ class Game {
             }
             
             // Convert mouse coordinates to normalized device coordinates (NDC)
-            // NDC range from -1 to 1 for both x and y
             const mouse = new THREE.Vector2(
                 (event.clientX / window.innerWidth) * 2 - 1,
-                -(event.clientY / window.innerHeight) * 2 + 1  // Note the negative sign to invert Y
+                -(event.clientY / window.innerHeight) * 2 + 1
             );
             
             // Raycasting to get the point on the ground plane
@@ -254,8 +268,6 @@ class Game {
             // Find the first intersection with the ground plane
             for (const intersect of intersects) {
                 const object = intersect.object;
-                
-                // Assuming ground is a plane with y normal
                 if (object.geometry instanceof THREE.PlaneGeometry) {
                     this.mousePosition.copy(intersect.point);
                     break;
@@ -271,15 +283,29 @@ class Game {
         });
         
         // Start game button
-        document.getElementById('start-game').addEventListener('click', () => {
-            const username = document.getElementById('username-input').value.trim();
-            this.startGame(username);
-        });
+        const startGameButton = document.getElementById('start-game');
+        if (startGameButton) {
+            startGameButton.addEventListener('click', () => {
+                const usernameInput = document.getElementById('username-input');
+                if (usernameInput) {
+                    const username = usernameInput.value.trim();
+                    this.startGame(username);
+                }
+            });
+        }
         
-        // Restart game button
-        document.getElementById('restart-game').addEventListener('click', () => {
-            this.restartGame();
-        });
+        // Game over screen buttons
+        if (this.playAgainButton) {
+            this.playAgainButton.addEventListener('click', () => {
+                this.restartGame();
+            });
+        }
+        
+        if (this.mainMenuButton) {
+            this.mainMenuButton.addEventListener('click', () => {
+                this.showMainMenu();
+            });
+        }
     }
     
     /**
@@ -336,6 +362,9 @@ class Game {
         // Start game loop
         this.lastFrameTime = performance.now();
         requestAnimationFrame(this.gameLoop.bind(this));
+        
+        // Start background music
+        this.audioManager.playBackgroundMusic();
     }
     
     /**
@@ -371,6 +400,8 @@ class Game {
      */
     gameOver() {
         this.isRunning = false;
+        this.audioManager.stopBackgroundMusic();
+        this.audioManager.playSound('gameOver');
         
         // Save score to leaderboard
         const position = this.leaderboard.saveScore();
@@ -517,6 +548,7 @@ class Game {
             );
             
             this.projectiles.push(projectile);
+            this.audioManager.playSound('shoot');
         } else {
             console.log("Failed to create projectile - check cooldown or active status");
         }
@@ -577,7 +609,7 @@ class Game {
         }
         
         // Add a larger collision buffer to help prevent objects from clipping through obstacles
-        const collisionBuffer = 0.25; // Increased from 0.2
+        const collisionBuffer = 0.5; // Increased buffer to ensure tanks do not clip through obstacles (was 0.25)
         
         const entityBox = {
             position: position,
@@ -841,7 +873,8 @@ class Game {
                     detonation.position,
                     detonation.radius,
                     detonation.damage,
-                    detonation.owner
+                    detonation.owner,
+                    true // mineExplosion flag
                 );
                 
                 // Remove mine
@@ -863,7 +896,7 @@ class Game {
     /**
      * Handle explosions (e.g., from mines)
      */
-    handleExplosion(position, radius, damage, source) {
+    handleExplosion(position, radius, damage, source, mineExplosion = false) {
         // Check all tanks in explosion radius
         const tanks = [this.player, ...this.enemies].filter(t => t && t.active);
         
@@ -877,23 +910,27 @@ class Game {
                 tank.position.x, tank.position.z
             );
             
-            // Damage falls off with distance
             if (distance < radius) {
-                // Calculate damage factor based on distance
-                const damageFactor = 1 - (distance / radius);
-                const finalDamage = Math.max(1, Math.floor(damage * damageFactor));
-                
-                // Apply damage
-                const destroyed = tank.takeDamage(finalDamage);
-                
-                // Handle player death
-                if (tank === this.player && destroyed) {
-                    this.playerDied();
-                }
-                
-                // Handle enemy death
-                if (tank !== this.player && destroyed) {
-                    this.enemyDestroyed(tank);
+                if (mineExplosion) {
+                    // For mine explosions, kill any tank in range
+                    tank.takeDamage(9999);
+                    if (tank === this.player) {
+                        this.playerDied();
+                    } else {
+                        this.enemyDestroyed(tank);
+                    }
+                } else {
+                    // Damage falls off with distance for other explosions
+                    const damageFactor = 1 - (distance / radius);
+                    const finalDamage = Math.max(1, Math.floor(damage * damageFactor));
+                    const destroyed = tank.takeDamage(finalDamage);
+                    
+                    if (tank === this.player && destroyed) {
+                        this.playerDied();
+                    }
+                    if (tank !== this.player && destroyed) {
+                        this.enemyDestroyed(tank);
+                    }
                 }
             }
         }
@@ -903,35 +940,26 @@ class Game {
             const obstacle = this.obstacles[i];
             
             if (obstacle.userData && obstacle.userData.isBreakable) {
-                // Calculate distance to explosion center
                 const distance = Utils.distance(
                     position.x, position.z,
                     obstacle.position.x, obstacle.position.z
                 );
                 
-                // Damage falls off with distance
                 if (distance < radius) {
-                    // Calculate damage factor based on distance
                     const damageFactor = 1 - (distance / radius);
                     const finalDamage = Math.max(1, Math.floor(damage * damageFactor));
-                    
-                    // Apply damage
                     obstacle.userData.health -= finalDamage;
                     
-                    // Destroy block if health is depleted
                     if (obstacle.userData.health <= 0) {
-                        // Remove from scene
                         this.scene.remove(obstacle);
-                        
-                        // Remove from obstacles array
                         this.obstacles.splice(i, 1);
-                        
-                        // Create destruction effect at the obstacle's position
                         Utils.createExplosion(this.scene, obstacle.position, 0.8, 500);
                     }
                 }
             }
         }
+        
+        this.audioManager.playSound('explosion');
     }
     
     /**
@@ -978,49 +1006,38 @@ class Game {
         this.lives--;
         this.updateHUD();
         
-        // Pause the game
-        this.isPaused = true;
-        
-        // Create and display the lives remaining popup
-        const popup = document.createElement('div');
-        popup.className = 'lives-popup';
-        popup.innerHTML = `
-            <h2>Tank Destroyed!</h2>
-            <p>Lives Remaining: ${this.lives}</p>
-            <p>Respawning in 3 seconds...</p>
-        `;
-        document.body.appendChild(popup);
-        
         if (this.lives <= 0) {
-            // Game over
+            this.gameOver();
+        } else {
+            // Create death effect
+            Utils.createExplosion(this.scene, this.player.position, 1.5, 1000);
+            
+            // Reset player position and state
+            this.player.reset();
+            
+            // Add brief invulnerability period
+            this.player.active = false;
+            setTimeout(() => {
+                this.player.active = true;
+            }, 2000); // 2 seconds of invulnerability
+            
+            // Play death sound
+            this.audioManager.playSound('explosion');
+            
+            // Show respawn message
+            const popup = document.createElement('div');
+            popup.className = 'lives-popup';
+            popup.innerHTML = `
+                <h2>Tank Destroyed!</h2>
+                <p>Lives remaining: ${this.lives}</p>
+                <p>Respawning...</p>
+            `;
+            document.body.appendChild(popup);
+            
+            // Remove popup after delay
             setTimeout(() => {
                 document.body.removeChild(popup);
-                this.gameOver();
             }, 2000);
-        } else {
-            // Respawn player after a delay with countdown
-            let countdown = 3;
-            const countdownInterval = setInterval(() => {
-                countdown--;
-                if (countdown > 0) {
-                    popup.querySelector('p:last-child').textContent = `Respawning in ${countdown} seconds...`;
-                } else {
-                    clearInterval(countdownInterval);
-                    document.body.removeChild(popup);
-                    
-                    // Respawn player
-                    if (this.level && this.level.playerStart) {
-                        this.player = new PlayerTank(
-                            this.scene,
-                            this.level.playerStart.x,
-                            this.level.playerStart.z
-                        );
-                    }
-                    
-                    // Unpause the game
-                    this.isPaused = false;
-                }
-            }, 1000);
         }
     }
     
@@ -1086,8 +1103,8 @@ class Game {
         const y = 0.3; // Height of obstacles
         
         if (type === 'wall') {
-            // Wall - solid obstacle (brown)
-            geometry = new THREE.BoxGeometry(1.0, 0.6, 1.0);
+            // Wall - solid obstacle (brown) with no gaps and indestructible
+            geometry = new THREE.BoxGeometry(2.0, 0.6, 2.0);
             material = new THREE.MeshStandardMaterial({
                 color: 0x8B4513, // Brown
                 roughness: 0.8,
@@ -1098,10 +1115,11 @@ class Game {
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             
-            // Add custom properties for game logic
+            // Mark as a wall obstacle for game logic (indestructible)
             mesh.userData.isWall = true;
             mesh.userData.isLevel = true; // Mark as level wall (not boundary)
-            mesh.userData.size = { x: 1.0, z: 1.0 }; // Full size for tight wall connections
+            mesh.userData.size = { x: 2.0, z: 2.0 }; // Updated size for contiguous walls
+            mesh.userData.isBreakable = false; // Walls are indestructible
             
         } else if (type === 'block') {
             // Breakable block (grey)
@@ -1156,5 +1174,12 @@ class Game {
         
         // Initialize HUD values
         this.updateHUD();
+    }
+    
+    showMainMenu() {
+        this.gameOver.classList.add('hidden');
+        this.userPrompt.classList.remove('hidden');
+        this.audioManager.stopBackgroundMusic();
+        this.audioManager.stopAllSounds();
     }
 } 

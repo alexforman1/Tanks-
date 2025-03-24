@@ -20,17 +20,45 @@
                     <h2>Enter Your Name</h2>
                     <input type="text" id="username-input" maxlength="15" placeholder="Player">
                     <button id="start-game">Start Game</button>
+                    <div class="controls-section">
+                        <h3>How to Play</h3>
+                        <div class="controls-grid">
+                            <div class="control-item">
+                                <span class="key">W/S</span>
+                                <span class="description">Move forward/backward</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key">A/D</span>
+                                <span class="description">Turn tank left/right</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key">Mouse</span>
+                                <span class="description">Aim turret</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key">Left Click</span>
+                                <span class="description">Fire</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key">Spacebar</span>
+                                <span class="description">Drop mine</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div id="game-over" class="modal hidden">
                 <div class="modal-content">
                     <h2>Game Over</h2>
-                    <div id="final-score"></div>
+                    <div id="final-score" class="final-score"></div>
                     <div id="leaderboard">
                         <h3>Top Scores</h3>
                         <div id="leaderboard-list"></div>
                     </div>
-                    <button id="restart-game">Play Again</button>
+                    <div class="button-group">
+                        <button id="play-again">Play Again</button>
+                        <button id="main-menu">Main Menu</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -41,17 +69,24 @@
     </div>
 
     <!-- Three.js library -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/examples/js/controls/OrbitControls.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/"
+        }
+    }
+    </script>
     
     <!-- Game scripts -->
-    <script src="js/utils.js"></script>
-    <script src="js/leaderboard.js"></script>
-    <script src="js/levels.js"></script>
-    <script src="js/projectile.js"></script>
-    <script src="js/mine.js"></script>
-    <script src="js/tank.js"></script>
-    <script src="js/game.js"></script>
-    <script src="js/main.js"></script>
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/leaderboard.js"></script>
+    <script type="module" src="js/levels.js"></script>
+    <script type="module" src="js/projectile.js"></script>
+    <script type="module" src="js/mine.js"></script>
+    <script type="module" src="js/tank.js"></script>
+    <script type="module" src="js/audio.js"></script>
+    <script type="module" src="js/game.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html> 

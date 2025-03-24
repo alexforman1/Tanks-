@@ -1,156 +1,111 @@
+import * as THREE from 'three';
+
 /**
  * Utility functions for the Tanks! game
  */
 
 // Helper for random number generation
-const Utils = {
-    // Random number between min and max (inclusive)
-    random: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
+export class Utils {
+    static random(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
     
     // Random element from an array
-    randomElement: (array) => array[Math.floor(Math.random() * array.length)],
+    static randomElement(array) {
+        return array[Math.floor(Math.random() * array.length)];
+    }
     
     // Detect collision between two objects with position and size
-    boxCollision: (box1, box2) => {
-        // Check if either box or their properties are undefined/null
-        if (!box1 || !box2 || !box1.position || !box2.position || 
-            !box1.size || !box2.size) {
-            return false;
-        }
-        
-        // Safe access to position and size properties
-        const pos1 = box1.position || { x: 0, z: 0 };
-        const pos2 = box2.position || { x: 0, z: 0 };
-        const size1 = box1.size || { x: 0, z: 0 };
-        const size2 = box2.size || { x: 0, z: 0 };
-        
-        // Ensure position and size properties have x and z
-        if (pos1.x === undefined || pos1.z === undefined || 
-            pos2.x === undefined || pos2.z === undefined ||
-            size1.x === undefined || size1.z === undefined ||
-            size2.x === undefined || size2.z === undefined) {
-            return false;
-        }
-        
-        // Get half-sizes for more intuitive collision calculation
-        const halfWidth1 = size1.x / 2;
-        const halfDepth1 = size1.z / 2;
-        const halfWidth2 = size2.x / 2;
-        const halfDepth2 = size2.z / 2;
-        
-        // AABB (Axis-Aligned Bounding Box) collision check with slightly expanded bounds
-        // This adds a tiny bit of extra collision margin
-        const collisionMargin = 0.05;
-        
+    static boxCollision(box1, box2) {
         return (
-            pos1.x - (halfWidth1 + collisionMargin) < pos2.x + (halfWidth2 + collisionMargin) &&
-            pos1.x + (halfWidth1 + collisionMargin) > pos2.x - (halfWidth2 + collisionMargin) &&
-            pos1.z - (halfDepth1 + collisionMargin) < pos2.z + (halfDepth2 + collisionMargin) &&
-            pos1.z + (halfDepth1 + collisionMargin) > pos2.z - (halfDepth2 + collisionMargin)
+            box1.position.x - box1.size.x/2 < box2.position.x + box2.size.x/2 &&
+            box1.position.x + box1.size.x/2 > box2.position.x - box2.size.x/2 &&
+            box1.position.z - box1.size.z/2 < box2.position.z + box2.size.z/2 &&
+            box1.position.z + box1.size.z/2 > box2.position.z - box2.size.z/2
         );
-    },
+    }
     
     // Calculate distance between two points
-    distance: (x1, z1, x2, z2) => {
+    static distance(x1, z1, x2, z2) {
         return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(z2 - z1, 2));
-    },
+    }
     
     // Calculate angle between two points in radians
-    angle: (x1, z1, x2, z2) => {
+    static angle(x1, z1, x2, z2) {
         return Math.atan2(z2 - z1, x2 - x1);
-    },
+    }
     
     // Convert degrees to radians
-    degToRad: (degrees) => degrees * (Math.PI / 180),
+    static degToRad(degrees) {
+        return degrees * (Math.PI / 180);
+    }
     
     // Convert radians to degrees
-    radToDeg: (radians) => radians * (180 / Math.PI),
+    static radToDeg(radians) {
+        return radians * (180 / Math.PI);
+    }
     
     // Clamp a value between min and max
-    clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
+    static clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
     
     // Linear interpolation
-    lerp: (a, b, t) => a + (b - a) * t,
+    static lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
     
     // Deep clone an object
-    deepClone: (obj) => JSON.parse(JSON.stringify(obj)),
+    static deepClone(obj) {
+        return JSON.parse(JSON.stringify(obj));
+    }
     
     // Create an explosion effect at position
-    createExplosion: (scene, position, radius = 1, duration = 1000) => {
+    static createExplosion(scene, position, scale, duration) {
+        const particleCount = 20;
         const particles = [];
-        const count = 20;
+        const geometry = new THREE.SphereGeometry(0.1, 8, 8);
+        const material = new THREE.MeshBasicMaterial({ color: 0xff6600 });
         
-        // Create particle group
-        for (let i = 0; i < count; i++) {
-            const geometry = new THREE.SphereGeometry(0.1, 8, 8);
-            const material = new THREE.MeshBasicMaterial({ 
-                color: 0xffaa00,
-                transparent: true,
-                opacity: 1 
-            });
-            
+        for (let i = 0; i < particleCount; i++) {
             const particle = new THREE.Mesh(geometry, material);
+            particle.position.copy(position);
             
-            // Set random position within radius
+            // Random direction
             const angle = Math.random() * Math.PI * 2;
-            const r = Math.random() * radius;
-            const x = Math.cos(angle) * r;
-            const z = Math.sin(angle) * r;
-            
-            particle.position.set(
-                position.x + x,
-                position.y + Math.random() * 0.5,
-                position.z + z
+            const speed = 0.5 + Math.random() * 0.5;
+            particle.userData.velocity = new THREE.Vector3(
+                Math.cos(angle) * speed,
+                Math.random() * speed,
+                Math.sin(angle) * speed
             );
-            
-            // Set random velocity
-            particle.velocity = {
-                x: x * 0.1,
-                y: 0.1 + Math.random() * 0.1,
-                z: z * 0.1
-            };
             
             scene.add(particle);
             particles.push(particle);
         }
         
-        // Animation timer
-        const startTime = Date.now();
+        const startTime = performance.now();
         
-        // Animation function
         function animateParticles() {
-            const elapsed = Date.now() - startTime;
-            const progress = elapsed / duration;
+            const currentTime = performance.now();
+            const elapsed = currentTime - startTime;
             
-            if (progress < 1) {
-                // Update particles
+            if (elapsed < duration) {
                 particles.forEach(particle => {
-                    particle.position.x += particle.velocity.x;
-                    particle.position.y += particle.velocity.y;
-                    particle.position.z += particle.velocity.z;
-                    
-                    // Slow down
-                    particle.velocity.x *= 0.95;
-                    particle.velocity.y *= 0.95;
-                    particle.velocity.z *= 0.95;
-                    
-                    // Fade out
-                    particle.material.opacity = 1 - progress;
-                    particle.scale.multiplyScalar(0.97);
+                    particle.position.add(particle.userData.velocity);
+                    particle.userData.velocity.y -= 0.01; // Gravity
                 });
                 
                 requestAnimationFrame(animateParticles);
             } else {
-                // Remove particles
                 particles.forEach(particle => {
                     scene.remove(particle);
-                    particle.geometry.dispose();
-                    particle.material.dispose();
+                    geometry.dispose();
+                    material.dispose();
                 });
             }
         }
         
-        // Start animation
         animateParticles();
     }
-}; 
+} 

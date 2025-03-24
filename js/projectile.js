@@ -1,7 +1,10 @@
+import * as THREE from 'three';
+import { Utils } from './utils.js';
+
 /**
  * Projectile Class - Represents bullets fired by tanks
  */
-class Projectile {
+export class Projectile {
     constructor(scene, position, direction, speed = 0.05, owner = null) {
         // Safety check - don't create projectiles with zero direction
         if (direction.lengthSq() === 0) {

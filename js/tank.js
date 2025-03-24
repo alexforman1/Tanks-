@@ -1,16 +1,20 @@
+import * as THREE from 'three';
+import { Utils } from './utils.js';
+
 /**
  * Tank Class - Base class for player and enemy tanks
  */
-class Tank {
+export class Tank {
     constructor(scene, x, z, color = 0x44aa44) {
         this.scene = scene;
         this.position = new THREE.Vector3(x, 0.3, z);
+        this.initialPosition = this.position.clone();
         this.direction = new THREE.Vector3(1, 0, 0);
         this.turretDirection = new THREE.Vector3(1, 0, 0);
         this.turretTarget = null; // Store the actual target position
         this.speed = 0.008;
         this.turnSpeed = 0.01;
-        this.size = { x: 0.8, z: 0.8 };
+        this.size = { x: 1.0, z: 1.0 };
         this.health = 1;
         this.lastShootTime = 0;
         this.shootCooldown = 750; // ms
@@ -489,6 +493,19 @@ class Tank {
     }
     
     /**
+     * Reset tank to initial state
+     */
+    reset() {
+        this.active = true;
+        this.mesh.visible = true;
+        this.position.copy(this.initialPosition);
+        this.direction.set(1, 0, 0);
+        this.mesh.position.copy(this.position);
+        this.mesh.rotation.y = 0;
+        this.turret.rotation.y = 0;
+    }
+
+    /**
      * Remove tank from scene
      */
     remove() {
@@ -507,12 +524,13 @@ class Tank {
  * PlayerTank Class - Represents the player's tank
  * Extends the base Tank class with player-specific functionality
  */
-class PlayerTank extends Tank {
+export class PlayerTank extends Tank {
     constructor(scene, x, z) {
         super(scene, x, z, 0x4444dd); // Blue color for player
         this.health = 2; // Player has more health
         this.shootCooldown = 500; // ms - faster shooting for player
         this.inputEnabled = true;
+        this.initialPosition = new THREE.Vector3(x, 0.3, z);
         
         // Override size for player tank
         this.size = { x: 0.8, z: 0.8 };
@@ -561,12 +579,26 @@ class PlayerTank extends Tank {
             this.aimAt(mousePos.x, mousePos.z);
         }
     }
+    
+    /**
+     * Reset the player tank to initial state
+     */
+    reset() {
+        this.active = true;
+        this.health = 2;
+        this.mesh.visible = true;
+        this.position.copy(this.initialPosition);
+        this.direction.set(1, 0, 0);
+        this.mesh.position.copy(this.position);
+        this.mesh.rotation.y = 0;
+        this.turret.rotation.y = 0;
+    }
 }
 
 /**
  * EnemyTank Class - Base class for AI-controlled enemy tanks
  */
-class EnemyTank extends Tank {
+export class EnemyTank extends Tank {
     constructor(scene, x, z, type = "basic", speedMultiplier = 1) {
         let color, health, speed, shootCooldown;
         
@@ -988,7 +1020,7 @@ class EnemyTank extends Tank {
     }
     
     /**
-     * Helper method to move towards a target position
+     * Helper method to move towards a target position (EnemyTank version)
      */
     moveTowardsTarget(target, deltaTime, speedFactor = 1) {
         if (!target) return;
@@ -998,24 +1030,21 @@ class EnemyTank extends Tank {
             target.z - this.position.z,
             target.x - this.position.x
         );
-        
-        // Get current facing angle of the tank
+        // Current facing angle of the tank
         const currentAngle = this.mesh.rotation.y;
         
-        // Calculate angle difference between target direction and current facing
+        // Calculate angle difference
         let angleDiff = targetAngle - currentAngle;
-        
-        // Normalize to -PI to PI
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
         
-        // Determine whether to turn or move
-        // Use a tighter angle threshold to reduce spinning
-        const angleTolerance = Math.PI / 16; // Much smaller tolerance (about 11 degrees)
+        // Use a tighter angle threshold
+        const angleTolerance = Math.PI / 16; // ~11 degrees
         
         if (Math.abs(angleDiff) > angleTolerance) {
-            // Need to turn to face target - use a consistent turn rate
-            const turnAmount = Math.min(Math.abs(angleDiff), this.turnSpeed * 2);
+            // Calculate maximum turn allowed this frame (60fps baseline)
+            const maxTurn = this.turnSpeed * (deltaTime / 16.67);
+            const turnAmount = Math.min(Math.abs(angleDiff), maxTurn);
             
             if (angleDiff > 0) {
                 this.turnLeft(turnAmount / this.turnSpeed);
@@ -1023,7 +1052,7 @@ class EnemyTank extends Tank {
                 this.turnRight(turnAmount / this.turnSpeed);
             }
         } else {
-            // Facing the right direction, move forward
+            // If aligned, move forward
             this.moveForward(speedFactor);
         }
     }
